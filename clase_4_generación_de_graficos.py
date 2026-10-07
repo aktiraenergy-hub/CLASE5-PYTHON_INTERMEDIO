@@ -1,14 +1,15 @@
 # ==============================================================================
-# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME ADMIN
+# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME (3x2 + OKRs)
 # ==============================================================================
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # ------------------------------------------------------------------------------
-# 1. CONFIGURACIÓN VISUAL DE STREAMLIT
+# 1. CONFIGURACIÓN VISUAL
 # ------------------------------------------------------------------------------
 st.set_page_config(
     page_title="Invome - Executive Sales Dashboard",
@@ -18,7 +19,7 @@ st.set_page_config(
 )
 
 # ------------------------------------------------------------------------------
-# 2. INYECCIÓN CSS PERSONALIZADO (LOOK & FEEL INVOME)
+# 2. ESTILOS CSS PERSONALIZADOS (INVOME CARDS & OKRs)
 # ------------------------------------------------------------------------------
 st.markdown("""
 <style>
@@ -28,33 +29,25 @@ st.markdown("""
         font-family: 'Plus Jakarta Sans', sans-serif !important;
     }
 
-    /* Fondo principal gris suave */
     .stApp {
         background-color: #F8FAFC !important;
     }
 
-    /* Ocultar barra superior por defecto de Streamlit */
     header[data-testid="stHeader"] {
         background-color: transparent !important;
     }
 
-    /* Sidebar con estilo blanco minimalista */
     [data-testid="stSidebar"] {
         background-color: #FFFFFF !important;
         border-right: 1px solid #EEF2F6;
     }
-    
-    [data-testid="stSidebar"] hr {
-        margin: 1.2rem 0;
-        border-color: #F1F5F9;
-    }
 
-    /* Header superior tipo Invome */
+    /* Header superior */
     .top-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.5rem 0 1.5rem 0;
+        padding: 0.5rem 0 1.2rem 0;
     }
     .top-title {
         font-size: 1.6rem;
@@ -70,16 +63,15 @@ st.markdown("""
         padding: 0.5rem 1.1rem;
         border-radius: 10px;
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-        display: inline-block;
+        cursor: pointer;
     }
 
-    /* Tarjetas KPI estilo tarjeta bancaria con gradiente */
+    /* Tarjetas KPI con OKRs integrados */
     .kpi-card {
         border-radius: 18px;
-        padding: 1.3rem 1.3rem 1.1rem 1.3rem;
+        padding: 1.2rem 1.3rem;
         color: #FFFFFF;
-        position: relative;
-        min-height: 145px;
+        min-height: 180px;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
         transition: transform 0.2s ease;
         display: flex;
@@ -92,49 +84,70 @@ st.markdown("""
     .card-top {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
+        align-items: center;
     }
     .card-label {
         font-size: 0.78rem;
-        font-weight: 500;
+        font-weight: 600;
         opacity: 0.9;
-        text-transform: capitalize;
-    }
-    .card-chip {
-        width: 32px;
-        height: 24px;
-        background: rgba(255, 255, 255, 0.25);
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.35);
-    }
-    .card-value {
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        margin: 0.6rem 0;
-    }
-    .card-footer-info {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.68rem;
-        opacity: 0.85;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+    .card-chip {
+        width: 32px;
+        height: 22px;
+        background: rgba(255, 255, 255, 0.25);
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    .card-value {
+        font-size: 1.65rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        margin: 0.3rem 0;
+    }
+    
+    /* Contenedor OKR */
+    .okr-box {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 10px;
+        padding: 0.45rem 0.6rem;
+        margin-top: 0.4rem;
+    }
+    .okr-title {
+        font-size: 0.68rem;
+        font-weight: 700;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+        opacity: 0.95;
+    }
+    .okr-progress-bg {
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .okr-progress-fill {
+        height: 100%;
+        background: #FFFFFF;
+        border-radius: 4px;
+    }
 
-    /* Gradientes individuales tipo tarjeta */
+    /* Gradientes */
     .grad-emerald { background: linear-gradient(135deg, #10B981 0%, #059669 100%); }
     .grad-orange  { background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); }
     .grad-blue    { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); }
     .grad-purple  { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); }
 
-    /* Contenedor gráfico estilo tarjeta blanca */
-    .plot-container {
+    /* Contenedor del Dashboard */
+    .dashboard-wrapper {
         background: #FFFFFF;
-        border-radius: 18px;
+        border-radius: 20px;
         padding: 1.5rem;
-        border: 1px solid #F1F5F9;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+        border: 1px solid #EEF2F6;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
         margin-top: 1.5rem;
     }
 </style>
@@ -156,13 +169,12 @@ except Exception as e:
     st.stop()
 
 # ------------------------------------------------------------------------------
-# 4. SIDEBAR ESTILIZADO (PERFIL & FILTROS)
+# 4. SIDEBAR
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    # Perfil corporativo de la interfaz Invome
     st.markdown("""
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1.2rem;">
-            <div style="width: 42px; height: 42px; border-radius: 12px; background: #E6F4EA; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <div style="width: 40px; height: 40px; border-radius: 12px; background: #E6F4EA; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
                 📗
             </div>
             <div>
@@ -181,40 +193,56 @@ with st.sidebar:
 
     st.markdown("<p style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>Filtros de Negocio</p>", unsafe_allow_html=True)
 
-    regiones_disponibles = sorted(df_raw['Region'].dropna().unique())
-    filtro_region = st.multiselect("Región Geográfica:", options=regiones_disponibles, default=regiones_disponibles)
+    regiones = sorted(df_raw['Region'].dropna().unique())
+    filtro_region = st.multiselect("Región Geográfica:", options=regiones, default=regiones)
 
-    canales_disponibles = sorted(df_raw['Canal_Venta'].dropna().unique())
-    filtro_canal = st.multiselect("Canal Comercial:", options=canales_disponibles, default=canales_disponibles)
+    canales = sorted(df_raw['Canal_Venta'].dropna().unique())
+    filtro_canal = st.multiselect("Canal Comercial:", options=canales, default=canales)
 
-    categorias_disponibles = sorted(df_raw['Categoria'].dropna().unique())
-    filtro_categoria = st.multiselect("Categoría:", options=categorias_disponibles, default=categorias_disponibles)
+    categorias = sorted(df_raw['Categoria'].dropna().unique())
+    filtro_categoria = st.multiselect("Categoría:", options=categorias, default=categorias)
 
-# Aplicar filtros
 df_filtrado = df_raw[
     (df_raw['Region'].isin(filtro_region)) &
     (df_raw['Canal_Venta'].isin(filtro_canal)) &
     (df_raw['Categoria'].isin(filtro_categoria))
-]
+].copy()
 
 if df_filtrado.empty:
     st.warning("⚠ No hay datos disponibles para la combinación de filtros seleccionada.")
     st.stop()
 
 # ------------------------------------------------------------------------------
-# 5. ENCABEZADO Y TARJETAS EN FORMA DE TARJETA (KPIS)
+# 5. CÁLCULO DE KPIs Y DEFINICIÓN DE OKRs
 # ------------------------------------------------------------------------------
-st.markdown("""
-    <div class="top-header">
-        <div class="top-title">Dashboard Comercial</div>
-        <div class="badge-btn">+ Generar Reporte</div>
-    </div>
-""", unsafe_allow_html=True)
-
 total_venta = df_filtrado['Venta_Real_USD'].sum()
 total_meta = df_filtrado['Meta_Ventas_USD'].sum()
 total_ganancia = df_filtrado['Ganancia_USD'].sum()
 cumplimiento = (total_venta / total_meta * 100) if total_meta > 0 else 0
+margen_promedio = (total_ganancia / total_venta * 100) if total_venta > 0 else 0
+
+# Objetivos OKR Definidos para el Periodo
+OKR_META_VENTA = total_meta                         # OKR 1: Venta Real >= Meta Planificada
+okr_prog_venta = min(100.0, (total_venta / OKR_META_VENTA * 100)) if OKR_META_VENTA > 0 else 0
+
+OKR_CUMPLIMIENTO_OBJ = 100.0                       # OKR 2: Lograr al menos 100% de cumplimiento
+okr_prog_cump = min(100.0, (cumplimiento / OKR_CUMPLIMIENTO_OBJ * 100))
+
+OKR_GANANCIA_OBJ = total_meta * 0.35               # OKR 3: Ganancia neta esperada (35% de la meta)
+okr_prog_ganancia = min(100.0, (total_ganancia / OKR_GANANCIA_OBJ * 100)) if OKR_GANANCIA_OBJ > 0 else 0
+
+OKR_MARGEN_OBJ = 35.0                              # OKR 4: Margen operativo mínimo del 35%
+okr_prog_margen = min(100.0, (margen_promedio / OKR_MARGEN_OBJ * 100))
+
+# ------------------------------------------------------------------------------
+# 6. ENCABEZADO Y TARJETAS KPI CON OKRs
+# ------------------------------------------------------------------------------
+st.markdown("""
+    <div class="top-header">
+        <div class="top-title">Dashboard Comercial 2024</div>
+        <div class="badge-btn">+ Generar Reporte</div>
+    </div>
+""", unsafe_allow_html=True)
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -226,9 +254,14 @@ with col1:
                 <div class="card-chip"></div>
             </div>
             <div class="card-value">${total_venta:,.0f}</div>
-            <div class="card-footer-info">
-                <span>Valid: 12/24</span>
-                <span>Active</span>
+            <div class="okr-box">
+                <div class="okr-title">
+                    <span>OKR: Superar Meta Anual</span>
+                    <span>{okr_prog_venta:.1f}%</span>
+                </div>
+                <div class="okr-progress-bg">
+                    <div class="okr-progress-fill" style="width: {okr_prog_venta}%;"></div>
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -241,9 +274,14 @@ with col2:
                 <div class="card-chip"></div>
             </div>
             <div class="card-value">${total_meta:,.0f}</div>
-            <div class="card-footer-info">
-                <span>Target: 2024</span>
-                <span>Budget</span>
+            <div class="okr-box">
+                <div class="okr-title">
+                    <span>OKR: Base Presupuestal</span>
+                    <span>100% Fijada</span>
+                </div>
+                <div class="okr-progress-bg">
+                    <div class="okr-progress-fill" style="width: 100%;"></div>
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -256,9 +294,14 @@ with col3:
                 <div class="card-chip"></div>
             </div>
             <div class="card-value">{cumplimiento:.1f}%</div>
-            <div class="card-footer-info">
-                <span>KPI Ratio</span>
-                <span>Performance</span>
+            <div class="okr-box">
+                <div class="okr-title">
+                    <span>OKR: Eficiencia &gt;= 100%</span>
+                    <span>{okr_prog_cump:.1f}%</span>
+                </div>
+                <div class="okr-progress-bg">
+                    <div class="okr-progress-fill" style="width: {okr_prog_cump}%;"></div>
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -271,38 +314,53 @@ with col4:
                 <div class="card-chip"></div>
             </div>
             <div class="card-value">${total_ganancia:,.0f}</div>
-            <div class="card-footer-info">
-                <span>Margin USD</span>
-                <span>Net Profit</span>
+            <div class="okr-box">
+                <div class="okr-title">
+                    <span>OKR: Margen &gt;= 35% ({margen_promedio:.1f}%)</span>
+                    <span>{okr_prog_margen:.1f}%</span>
+                </div>
+                <div class="okr-progress-bg">
+                    <div class="okr-progress-fill" style="width: {okr_prog_margen}%;"></div>
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# 6. GRÁFICOS (2x2) CON PALETA Y ESTILOS MODERNOS
+# 7. DASHBOARD 3x2: GENERACIÓN DE LOS 6 GRÁFICOS
 # ------------------------------------------------------------------------------
-df_mes = df_filtrado.groupby('Mes_Nombre', sort=False)[['Venta_Real_USD', 'Meta_Ventas_USD']].sum()
-df_cat = df_filtrado.groupby('Categoria')['Venta_Real_USD'].sum().sort_values()
-df_canal = df_filtrado.groupby('Canal_Venta')['Venta_Real_USD'].sum()
-df_reg = df_filtrado.groupby('Region')['Ganancia_USD'].sum().sort_values(ascending=False)
+# Pre-cálculo para Pareto (Categoría)
+df_pareto = df_filtrado.groupby('Categoria')['Venta_Real_USD'].sum().sort_values(ascending=False).reset_index()
+df_pareto['Acumulado'] = df_pareto['Venta_Real_USD'].cumsum()
+df_pareto['Porcentaje_Acumulado'] = (df_pareto['Acumulado'] / df_pareto['Venta_Real_USD'].sum()) * 100
 
+# Pre-cálculo Agrupado Mensual
+df_mes = df_filtrado.groupby('Mes_Nombre', sort=False)[['Venta_Real_USD', 'Meta_Ventas_USD']].sum()
+
+# Pre-cálculo Donut Canal
+df_canal = df_filtrado.groupby('Canal_Venta')['Venta_Real_USD'].sum()
+
+# Configurar Subplots 3x2 con eje secundario para Pareto (Fila 1, Col 2)
 fig = make_subplots(
-    rows=2, cols=2,
+    rows=3, cols=2,
     subplot_titles=(
-        "<b>Evolución Mensual vs Meta Comercial</b>",
-        "<b>Ranking de Ventas por Categoría</b>",
-        "<b>Mix de Ingresos por Canal</b>",
-        "<b>Ganancia Neta por Región</b>"
+        "<b>1. Evolución Mensual vs Meta Comercial</b>",
+        "<b>2. Diagrama de Pareto por Categoría (80/20)</b>",
+        "<b>3. Análisis Multidimensional (Venta, Ganancia, Margen, Canal)</b>",
+        "<b>4. Dispersión y Outliers por Región (Bigotes / Box Plot)</b>",
+        "<b>5. Mix de Ingresos por Canal Comercial</b>",
+        "<b>6. Histograma de Distribución de Ganancia</b>"
     ),
     specs=[
+        [{"type": "xy"}, {"type": "xy", "secondary_y": True}],
         [{"type": "xy"}, {"type": "xy"}],
         [{"type": "domain"}, {"type": "xy"}]
     ],
-    vertical_spacing=0.15,
-    horizontal_spacing=0.10
+    vertical_spacing=0.11,
+    horizontal_spacing=0.08
 )
 
-# Cuadrante 1: Área y Línea
+# ----------------- [1, 1] EVOLUCIÓN MENSUAL -----------------
 fig.add_trace(
     go.Scatter(
         x=df_mes.index,
@@ -317,7 +375,6 @@ fig.add_trace(
     ),
     row=1, col=1
 )
-
 fig.add_trace(
     go.Scatter(
         x=df_mes.index,
@@ -330,23 +387,87 @@ fig.add_trace(
     row=1, col=1
 )
 
-# Cuadrante 2: Barras Horizontales con esquinas redondeadas
+# ----------------- [1, 2] PARETO POR CATEGORÍA -----------------
 fig.add_trace(
     go.Bar(
-        y=df_cat.index,
-        x=df_cat.values,
-        orientation='h',
-        name='Venta Categoría',
-        marker=dict(color='#0F172A', line_width=0),
-        text=[f"${v:,.0f}" for v in df_cat.values],
-        textposition='outside',
-        hovertemplate='<b>%{y}</b><br>Venta: $%{x:,.0f}<extra></extra>',
-        showlegend=False
+        x=df_pareto['Categoria'],
+        y=df_pareto['Venta_Real_USD'],
+        name='Venta ($)',
+        marker=dict(color='#1E293B', corner_radius=6 if hasattr(go.Bar(), 'corner_radius') else 0),
+        hovertemplate='<b>%{x}</b><br>Venta: $%{y:,.0f}<extra></extra>'
     ),
-    row=1, col=2
+    row=1, col=2, secondary_y=False
+)
+fig.add_trace(
+    go.Scatter(
+        x=df_pareto['Categoria'],
+        y=df_pareto['Porcentaje_Acumulado'],
+        name='% Acumulado',
+        mode='lines+markers',
+        line=dict(color='#F97316', width=3),
+        marker=dict(size=7, color='#EA580C'),
+        hovertemplate='<b>%{x}</b><br>Acumulado: %{y:.1f}%<extra></extra>'
+    ),
+    row=1, col=2, secondary_y=True
 )
 
-# Cuadrante 3: Donut Chart con paleta Invome
+# Línea de referencia del 80% (Ley de Pareto)
+fig.add_hline(y=80, line_dash="dot", line_color="#94A3B8", row=1, col=2, secondary_y=True)
+
+# ----------------- [2, 1] MULTIDIMENSIONAL (4 VARIABLES) -----------------
+# Var 1: X (Venta_Real_USD)
+# Var 2: Y (Ganancia_USD)
+# Var 3: Tamaño de Burbuja (Margen %)
+# Var 4: Color (Canal_Venta)
+palette_canal = {'E-commerce': '#10B981', 'Tienda Física': '#F97316', 'Ventas B2B': '#2563EB', 'Mayorista': '#8B5CF6'}
+
+for canal in df_filtrado['Canal_Venta'].dropna().unique():
+    sub_df = df_filtrado[df_filtrado['Canal_Venta'] == canal]
+    margen_calc = np.clip((sub_df['Ganancia_USD'] / sub_df['Venta_Real_USD'].replace(0, 1)) * 100, 5, 80)
+    
+    fig.add_trace(
+        go.Scatter(
+            x=sub_df['Venta_Real_USD'],
+            y=sub_df['Ganancia_USD'],
+            name=f'Canal: {canal}',
+            mode='markers',
+            marker=dict(
+                size=margen_calc,
+                sizemode='diameter',
+                sizeref=2.5,
+                color=palette_canal.get(canal, '#64748B'),
+                opacity=0.75,
+                line=dict(width=1, color='#FFFFFF')
+            ),
+            hovertemplate=(
+                f'<b>Canal: {canal}</b><br>' +
+                'Venta: $%{x:,.0f}<br>' +
+                'Ganancia: $%{y:,.0f}<br>' +
+                '<extra></extra>'
+            )
+        ),
+        row=2, col=1
+    )
+
+# ----------------- [2, 2] BIGOTES / BOX PLOT (POR REGIÓN) -----------------
+colores_box = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899']
+for i, reg in enumerate(df_filtrado['Region'].dropna().unique()):
+    sub_df = df_filtrado[df_filtrado['Region'] == reg]
+    fig.add_trace(
+        go.Box(
+            y=sub_df['Venta_Real_USD'],
+            name=reg,
+            boxpoints='outliers',
+            jitter=0.3,
+            pointpos=-1.8,
+            marker=dict(color=colores_box[i % len(colores_box)]),
+            line=dict(width=2),
+            showlegend=False
+        ),
+        row=2, col=2
+    )
+
+# ----------------- [3, 1] MIX POR CANAL (DONUT) -----------------
 fig.add_trace(
     go.Pie(
         labels=df_canal.index,
@@ -359,45 +480,62 @@ fig.add_trace(
         ),
         textinfo='percent',
         hovertemplate='<b>%{label}</b><br>$%{value:,.0f} (%{percent})<extra></extra>',
-        showlegend=True
-    ),
-    row=2, col=1
-)
-
-# Cuadrante 4: Ganancia por Región
-fig.add_trace(
-    go.Bar(
-        x=df_reg.index,
-        y=df_reg.values,
-        name='Ganancia Región',
-        marker=dict(color='#10B981', line_width=0),
-        text=[f"${v:,.0f}" for v in df_reg.values],
-        textposition='outside',
-        hovertemplate='<b>%{x}</b><br>Ganancia: $%{y:,.0f}<extra></extra>',
         showlegend=False
     ),
-    row=2, col=2
+    row=3, col=1
 )
 
-# Ajuste global del Plotly canvas a blanco y tipografía limpia
+# ----------------- [3, 2] HISTOGRAMA DE GANANCIA -----------------
+fig.add_trace(
+    go.Histogram(
+        x=df_filtrado['Ganancia_USD'],
+        nbinsx=25,
+        name='Frecuencia',
+        marker=dict(
+            color='#10B981',
+            line=dict(color='#FFFFFF', width=1)
+        ),
+        hovertemplate='Rango: $%{x}<br>Cantidad de Registros: %{y}<extra></extra>',
+        showlegend=False
+    ),
+    row=3, col=2
+)
+
+# ------------------------------------------------------------------------------
+# 8. LAYOUT GENERAL Y FORMATO
+# ------------------------------------------------------------------------------
 fig.update_layout(
-    font=dict(family='Plus Jakarta Sans, sans-serif', color='#475569'),
+    font=dict(family='Plus Jakarta Sans, sans-serif', color='#475569', size=11),
     paper_bgcolor='#FFFFFF',
     plot_bgcolor='#FFFFFF',
-    height=750,
+    height=1100,  # Altura adecuada para la matriz de 3x2
     hoverlabel=dict(bgcolor="#FFFFFF", font_size=12, font_family="Plus Jakarta Sans"),
-    legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="left", x=0.0),
-    margin=dict(t=70, b=30, l=30, r=30)
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="center",
+        x=0.5,
+        font=dict(size=11)
+    ),
+    margin=dict(t=80, b=40, l=40, r=40)
 )
 
+# Rejillas y ejes
 fig.update_xaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
 fig.update_yaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
 
+# Formateo monetario en ejes
 fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=1)
-fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=1, col=2)
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=2)
+fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=2, secondary_y=False)
+fig.update_yaxes(ticksuffix="%", range=[0, 105], row=1, col=2, secondary_y=True)
 
-# Despliegue dentro del contenedor blanco con sombra
-st.markdown('<div class="plot-container">', unsafe_allow_html=True)
+fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
+fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
+fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=2)
+fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=3, col=2)
+
+# Despliegue en Streamlit
+st.markdown('<div class="dashboard-wrapper">', unsafe_allow_html=True)
 st.plotly_chart(fig, use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
