@@ -1,5 +1,5 @@
 # ==============================================================================
-# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME (VISTAS ALTERNABLES + GITHUB REST)
+# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME (VISTAS + FILTROS TABLA + GITHUB)
 # ==============================================================================
 
 import streamlit as st
@@ -146,7 +146,7 @@ css_code = """
     .grad-blue    { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); }
     .grad-purple  { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); }
 
-    /* Contenedor del Dashboard y Tablas */
+    /* Contenedores blancos */
     .dashboard-wrapper {
         background: #FFFFFF;
         border-radius: 20px;
@@ -175,7 +175,7 @@ except Exception as e:
     st.stop()
 
 # ------------------------------------------------------------------------------
-# 4. SIDEBAR (PERFIL Y FILTROS)
+# 4. SIDEBAR (PERFIL Y FILTROS GLOBALES)
 # ------------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("""
@@ -197,7 +197,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<p style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>Filtros de Negocio</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>Filtros Globales de Negocio</p>", unsafe_allow_html=True)
 
     regiones = sorted(df_raw['Region'].dropna().unique())
     filtro_region = st.sidebar.multiselect("Región Geográfica:", options=regiones, default=regiones)
@@ -376,7 +376,7 @@ if vista_seleccionada == "📊 Dashboard":
     )
     fig.add_hline(y=80, line_dash="dot", line_color="#94A3B8", row=1, col=2, secondary_y=True)
 
-    # [2, 1] Multidimensional (4 Variables) - Hovertemplate en una sola línea segura
+    # [2, 1] Multidimensional (4 Variables)
     palette_canal = {'E-commerce': '#10B981', 'Tienda Física': '#F97316', 'Ventas B2B': '#2563EB', 'Mayorista': '#8B5CF6'}
 
     for canal in df_filtrado['Canal_Venta'].dropna().unique():
@@ -448,7 +448,7 @@ if vista_seleccionada == "📊 Dashboard":
                 color='#10B981',
                 line=dict(color='#FFFFFF', width=1)
             ),
-            hovertemplate='Rango: $%{x}<br>Cantidad: %{y}<extra></extra>',
+            hovertemplate='Rango: $%{x}<br>Cantidad de Registros: %{y}<extra></extra>',
             showlegend=False
         ),
         row=3, col=2
@@ -488,26 +488,95 @@ if vista_seleccionada == "📊 Dashboard":
     st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ===== VISTA 2: VER / EDITAR TABLA =====
+# ===== VISTA 2: VER / EDITAR TABLA (CON FILTROS INTERACTIVOS POR COLUMNA) =====
 else:
     st.markdown('<div class="dashboard-wrapper">', unsafe_allow_html=True)
     st.markdown("""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
             <div>
                 <h3 style="margin: 0; font-size: 1.3rem; font-weight: 800; color: #0F172A;">📋 Base de Datos Comercial 2024</h3>
-                <p style="margin: 0; font-size: 0.85rem; color: #64748B;">Edita directamente los valores en las celdas, inserta filas nuevas o elimina registros. Guarda los cambios para sincronizarlos con GitHub.</p>
+                <p style="margin: 0; font-size: 0.85rem; color: #64748B;">Utiliza los filtros de columna para segmentar o buscar cualquier registro, edítalo en la tabla y sincronízalo con GitHub.</p>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
+    # --------------------------------------------------------------------------
+    # FILTROS DINÁMICOS POR COLUMNA PARA LA TABLA
+    # --------------------------------------------------------------------------
+    with st.expander("🔍 **Filtros por Columna de la Tabla**", expanded=True):
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+
+        # Filtro 1: Búsqueda libre de texto por ID_Registro
+        with f_col1:
+            busqueda_id = st.text_input("Buscar por ID Registro:", placeholder="Ej: REG-2024-0001")
+
+        # Filtro 2: Mes
+        with f_col2:
+            meses_disp = sorted(df_raw['Mes_Nombre'].dropna().unique())
+            f_mes = st.multiselect("Filtrar Mes:", options=meses_disp, default=[])
+
+        # Filtro 3: Región
+        with f_col3:
+            reg_disp = sorted(df_raw['Region'].dropna().unique())
+            f_reg = st.multiselect("Filtrar Región:", options=reg_disp, default=[])
+
+        # Filtro 4: Categoría
+        with f_col4:
+            cat_disp = sorted(df_raw['Categoria'].dropna().unique())
+            f_cat = st.multiselect("Filtrar Categoría:", options=cat_disp, default=[])
+
+        f_col5, f_col6 = st.columns(2)
+        with f_col5:
+            canal_disp = sorted(df_raw['Canal_Venta'].dropna().unique())
+            f_canal = st.multiselect("Filtrar Canal:", options=canal_disp, default=[])
+
+        with f_col6:
+            min_venta = float(df_raw['Venta_Real_USD'].min())
+            max_venta = float(df_raw['Venta_Real_USD'].max())
+            rango_venta = st.slider("Rango de Venta Real (USD):", min_value=min_venta, max_value=max_venta, value=(min_venta, max_venta))
+
+    # Aplicar los filtros de tabla
+    df_tabla_filtrada = df_raw.copy()
+
+    if busqueda_id:
+        df_tabla_filtrada = df_tabla_filtrada[df_tabla_filtrada['ID_Registro'].astype(str).str.contains(busqueda_id, case=False, na=False)]
+    if f_mes:
+        df_tabla_filtrada = df_tabla_filtrada[df_tabla_filtrada['Mes_Nombre'].isin(f_mes)]
+    if f_reg:
+        df_tabla_filtrada = df_tabla_filtrada[df_tabla_filtrada['Region'].isin(f_reg)]
+    if f_cat:
+        df_tabla_filtrada = df_tabla_filtrada[df_tabla_filtrada['Categoria'].isin(f_cat)]
+    if f_canal:
+        df_tabla_filtrada = df_tabla_filtrada[df_tabla_filtrada['Canal_Venta'].isin(f_canal)]
+    
+    df_tabla_filtrada = df_tabla_filtrada[
+        (df_tabla_filtrada['Venta_Real_USD'] >= rango_venta[0]) & 
+        (df_tabla_filtrada['Venta_Real_USD'] <= rango_venta[1])
+    ]
+
+    st.caption(f"Mostrando **{len(df_tabla_filtrada)}** de **{len(df_raw)}** registros totales.")
+
+    # Formato de columnas numéricas y monetarias en el editor
+    col_config = {
+        "Venta_Real_USD": st.column_config.NumberColumn("Venta Real (USD)", format="$%.2f"),
+        "Meta_Ventas_USD": st.column_config.NumberColumn("Meta Ventas (USD)", format="$%.2f"),
+        "Costo_Total_USD": st.column_config.NumberColumn("Costo Total (USD)", format="$%.2f"),
+        "Ganancia_USD": st.column_config.NumberColumn("Ganancia (USD)", format="$%.2f"),
+        "Cumplimiento_Porcentaje": st.column_config.NumberColumn("Cumplimiento (%)", format="%.2f%%"),
+        "Margen_Porcentaje": st.column_config.NumberColumn("Margen (%)", format="%.2f%%")
+    }
+
+    # Editor interactivo con columnas formateadas
     df_editable = st.data_editor(
-        df_raw,
+        df_tabla_filtrada,
+        column_config=col_config,
         num_rows="dynamic",
         use_container_width=True,
-        height=520,
+        height=480,
         key="editor_ventas"
     )
 
+    # Función para persistir cambios en GitHub
     def guardar_en_github(df_actualizado):
         try:
             if "GITHUB_TOKEN" not in st.secrets or "GITHUB_REPO" not in st.secrets:
@@ -524,6 +593,7 @@ else:
                 "X-GitHub-Api-Version": "2022-11-28"
             }
 
+            # 1. Obtener SHA del archivo en GitHub
             url_archivo = f"https://api.github.com/repos/{repo_name}/contents/{archivo_path}"
             r_get = requests.get(url_archivo, headers=headers)
 
@@ -536,13 +606,28 @@ else:
 
             sha_actual = r_get.json().get("sha")
 
+            # Combinar filas editadas con el dataframe original si hubo filtros activos
+            df_final_guardar = df_raw.copy()
+            if 'ID_Registro' in df_actualizado.columns and 'ID_Registro' in df_final_guardar.columns:
+                df_final_guardar.set_index('ID_Registro', inplace=True)
+                df_actualizado_idx = df_actualizado.set_index('ID_Registro')
+                df_final_guardar.update(df_actualizado_idx)
+                # Agregar registros nuevos si se insertaron
+                nuevos_idx = df_actualizado_idx.index.difference(df_final_guardar.index)
+                if not nuevos_idx.empty:
+                    df_final_guardar = pd.concat([df_final_guardar, df_actualizado_idx.loc[nuevos_idx]])
+                df_final_guardar.reset_index(inplace=True)
+            else:
+                df_final_guardar = df_actualizado
+
+            # 2. Generar Excel en memoria
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_actualizado.to_excel(writer, sheet_name=sheet_name, index=False)
+                df_final_guardar.to_excel(writer, sheet_name=sheet_name, index=False)
             contenido_binario = buffer.getvalue()
-
             contenido_b64 = base64.b64encode(contenido_binario).decode('utf-8')
 
+            # 3. Enviar Commit vía API
             payload = {
                 "message": "Actualización de datos desde Dashboard Streamlit",
                 "content": contenido_b64,
@@ -559,6 +644,7 @@ else:
         except Exception as err:
             return False, f"Error inesperado: {err}"
 
+    # Botón de guardado
     col_btn1, col_btn2 = st.columns([1.5, 4])
     with col_btn1:
         if st.button("💾 Guardar cambios en GitHub", use_container_width=True):
