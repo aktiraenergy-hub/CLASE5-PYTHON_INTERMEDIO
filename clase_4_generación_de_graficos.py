@@ -1,5 +1,5 @@
 # ==============================================================================
-# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME (VISTAS ALTERNABLES + GITHUB)
+# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME (VISTAS ALTERNABLES + GITHUB REST)
 # ==============================================================================
 
 import streamlit as st
@@ -8,7 +8,8 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
-from github import Github
+import base64
+import requests
 
 # ------------------------------------------------------------------------------
 # 1. CONFIGURACIÓN VISUAL DE STREAMLIT
@@ -44,7 +45,7 @@ css_code = """
         border-right: 1px solid #EEF2F6;
     }
 
-    /* Selector de vistas superior en cápsula */
+    /* Selector de vistas superior tipo cápsula */
     div[data-testid="stRadio"] > div {
         flex-direction: row !important;
         background: #EEF2F6 !important;
@@ -255,7 +256,7 @@ with col_header_btn:
         label_visibility="collapsed"
     )
 
-# Función generadora de tarjeta KPI (evita errores de strings cortados)
+# Función generadora de tarjeta KPI
 def render_kpi_card(gradient_class, label, value_str, okr_name, okr_obj_str, progress_pct):
     card_html = (
         f'<div class="kpi-card {gradient_class}">'
@@ -398,159 +399,4 @@ if vista_seleccionada == "📊 Dashboard":
                     line=dict(width=1, color='#FFFFFF')
                 ),
                 hovertemplate=(
-                    f'<b>Canal: {canal}</b><br>' +
-                    'Venta: $%{x:,.0f}<br>' +
-                    'Ganancia: $%{y:,.0f}<br>' +
-                    '<extra></extra>'
-                )
-            ),
-            row=2, col=1
-        )
-
-    # [2, 2] Bigotes / Box Plot por Región
-    colores_box = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899']
-    for i, reg in enumerate(df_filtrado['Region'].dropna().unique()):
-        sub_df = df_filtrado[df_filtrado['Region'] == reg]
-        fig.add_trace(
-            go.Box(
-                y=sub_df['Venta_Real_USD'],
-                name=reg,
-                boxpoints='outliers',
-                jitter=0.3,
-                pointpos=-1.8,
-                marker=dict(color=colores_box[i % len(colores_box)]),
-                line=dict(width=2),
-                showlegend=False
-            ),
-            row=2, col=2
-        )
-
-    # [3, 1] Mix por Canal (Donut)
-    fig.add_trace(
-        go.Pie(
-            labels=df_canal.index,
-            values=df_canal.values,
-            hole=0.68,
-            name='Canal',
-            marker=dict(
-                colors=['#10B981', '#F97316', '#2563EB', '#8B5CF6'],
-                line=dict(color='#FFFFFF', width=3)
-            ),
-            textinfo='percent',
-            hovertemplate='<b>%{label}</b><br>$%{value:,.0f} (%{percent})<extra></extra>',
-            showlegend=False
-        ),
-        row=3, col=1
-    )
-
-    # [3, 2] Histograma de Ganancia
-    fig.add_trace(
-        go.Histogram(
-            x=df_filtrado['Ganancia_USD'],
-            nbinsx=25,
-            name='Frecuencia',
-            marker=dict(
-                color='#10B981',
-                line=dict(color='#FFFFFF', width=1)
-            ),
-            hovertemplate='Rango: $%{x}<br>Cantidad de Registros: %{y}<extra></extra>',
-            showlegend=False
-        ),
-        row=3, col=2
-    )
-
-    # Layout General
-    fig.update_layout(
-        font=dict(family='Plus Jakarta Sans, sans-serif', color='#475569', size=11),
-        paper_bgcolor='#FFFFFF',
-        plot_bgcolor='#FFFFFF',
-        height=1100,
-        hoverlabel=dict(bgcolor="#FFFFFF", font_size=12, font_family="Plus Jakarta Sans"),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="center",
-            x=0.5,
-            font=dict(size=11)
-        ),
-        margin=dict(t=80, b=40, l=40, r=40)
-    )
-
-    fig.update_xaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
-    fig.update_yaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
-
-    fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=1)
-    fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=2, secondary_y=False)
-    fig.update_yaxes(ticksuffix="%", range=[0, 105], row=1, col=2, secondary_y=True)
-
-    fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
-    fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
-    fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=2)
-    fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=3, col=2)
-
-    st.markdown('<div class="dashboard-wrapper">', unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ===== VISTA 2: VER / EDITAR TABLA =====
-else:
-    st.markdown('<div class="dashboard-wrapper">', unsafe_allow_html=True)
-    st.markdown("""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
-            <div>
-                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 800; color: #0F172A;">📋 Base de Datos Comercial 2024</h3>
-                <p style="margin: 0; font-size: 0.85rem; color: #64748B;">Edita directamente los valores en las celdas, inserta filas nuevas o elimina registros. Guarda los cambios para sincronizarlos con GitHub.</p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    df_editable = st.data_editor(
-        df_raw,
-        num_rows="dynamic",
-        use_container_width=True,
-        height=520,
-        key="editor_ventas"
-    )
-
-    def guardar_en_github(df_actualizado):
-        try:
-            if "GITHUB_TOKEN" not in st.secrets or "GITHUB_REPO" not in st.secrets:
-                return False, "Faltan configurar GITHUB_TOKEN y GITHUB_REPO en los Secrets de Streamlit."
-
-            token = st.secrets["GITHUB_TOKEN"]
-            repo_name = st.secrets["GITHUB_REPO"]
-            archivo_path = "Dataset_Visualizacion_Reporte_Empresarial_Sesion4.xlsx"
-            sheet_name = "Data_Ventas_Historica"
-
-            g = Github(token)
-            repo = g.get_repo(repo_name)
-            contenido_remoto = repo.get_contents(archivo_path)
-
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_actualizado.to_excel(writer, sheet_name=sheet_name, index=False)
-            contenido_binario = buffer.getvalue()
-
-            repo.update_file(
-                path=contenido_remoto.path,
-                message="Actualización de datos desde Dashboard Streamlit",
-                content=contenido_binario,
-                sha=contenido_remoto.sha
-            )
-            return True, "¡Cambios guardados con éxito en GitHub! La aplicación se actualizará automáticamente."
-        except Exception as err:
-            return False, f"Error al guardar en GitHub: {err}"
-
-    col_btn1, col_btn2 = st.columns([1.5, 4])
-    with col_btn1:
-        if st.button("💾 Guardar cambios en GitHub", use_container_width=True):
-            with st.spinner("Sincronizando con el repositorio..."):
-                exito, mensaje = guardar_en_github(df_editable)
-                if exito:
-                    st.success(mensaje)
-                    st.cache_data.clear()
-                else:
-                    st.error(mensaje)
-
-    st.markdown('</div>', unsafe_allow_html=True)
+                    f'<b>
