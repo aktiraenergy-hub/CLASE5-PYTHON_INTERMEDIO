@@ -1,5 +1,5 @@
 # ==============================================================================
-# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME (3x2 + OKRs)
+# DASHBOARD EJECUTIVO COMERCIAL 2024 - ESTILO INVOME (3x2 + OKRs + GITHUB SYNC)
 # ==============================================================================
 
 import streamlit as st
@@ -7,9 +7,11 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import io
+from github import Github
 
 # ------------------------------------------------------------------------------
-# 1. CONFIGURACIÓN VISUAL
+# 1. CONFIGURACIÓN VISUAL DE STREAMLIT
 # ------------------------------------------------------------------------------
 st.set_page_config(
     page_title="Invome - Executive Sales Dashboard",
@@ -142,7 +144,7 @@ st.markdown("""
     .grad-blue    { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); }
     .grad-purple  { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); }
 
-    /* Contenedor del Dashboard */
+    /* Contenedor del Dashboard y Tablas */
     .dashboard-wrapper {
         background: #FFFFFF;
         border-radius: 20px;
@@ -170,7 +172,7 @@ except Exception as e:
     st.stop()
 
 # ------------------------------------------------------------------------------
-# 4. SIDEBAR
+# 4. SIDEBAR (PERFIL Y FILTROS)
 # ------------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("""
@@ -195,13 +197,13 @@ with st.sidebar:
     st.markdown("<p style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>Filtros de Negocio</p>", unsafe_allow_html=True)
 
     regiones = sorted(df_raw['Region'].dropna().unique())
-    filtro_region = st.multiselect("Región Geográfica:", options=regiones, default=regiones)
+    filtro_region = st.sidebar.multiselect("Región Geográfica:", options=regiones, default=regiones)
 
     canales = sorted(df_raw['Canal_Venta'].dropna().unique())
-    filtro_canal = st.multiselect("Canal Comercial:", options=canales, default=canales)
+    filtro_canal = st.sidebar.multiselect("Canal Comercial:", options=canales, default=canales)
 
     categorias = sorted(df_raw['Categoria'].dropna().unique())
-    filtro_categoria = st.multiselect("Categoría:", options=categorias, default=categorias)
+    filtro_categoria = st.sidebar.multiselect("Categoría:", options=categorias, default=categorias)
 
 df_filtrado = df_raw[
     (df_raw['Region'].isin(filtro_region)) &
@@ -214,7 +216,7 @@ if df_filtrado.empty:
     st.stop()
 
 # ------------------------------------------------------------------------------
-# 5. CÁLCULO DE KPIs Y DEFINICIÓN DE OKRs (VALORES OBJETIVO)
+# 5. CÁLCULO DE KPIs Y DEFINICIÓN DE OKRs
 # ------------------------------------------------------------------------------
 total_venta = df_filtrado['Venta_Real_USD'].sum()
 total_meta = df_filtrado['Meta_Ventas_USD'].sum()
@@ -222,19 +224,16 @@ total_ganancia = df_filtrado['Ganancia_USD'].sum()
 cumplimiento = (total_venta / total_meta * 100) if total_meta > 0 else 0
 margen_promedio = (total_ganancia / total_venta * 100) if total_venta > 0 else 0
 
-# 1. OKR Venta: Objetivo numérico en dólares
+# Objetivos numéricos OKR
 VALOR_OBJETIVO_VENTA = total_meta
 prog_barra_venta = min(100.0, (total_venta / VALOR_OBJETIVO_VENTA * 100)) if VALOR_OBJETIVO_VENTA > 0 else 0
 
-# 2. OKR Meta: Meta comercial estipulada
 VALOR_OBJETIVO_META = total_meta
 prog_barra_meta = 100.0
 
-# 3. OKR Cumplimiento: Meta porcentual mínima
 VALOR_OBJETIVO_CUMPLIMIENTO = 100.0
 prog_barra_cumplimiento = min(100.0, (cumplimiento / VALOR_OBJETIVO_CUMPLIMIENTO * 100))
 
-# 4. OKR Ganancia: Margen meta 35% de la venta meta
 VALOR_OBJETIVO_GANANCIA = total_meta * 0.35
 prog_barra_ganancia = min(100.0, (total_ganancia / VALOR_OBJETIVO_GANANCIA * 100)) if VALOR_OBJETIVO_GANANCIA > 0 else 0
 
@@ -333,19 +332,14 @@ with col4:
 # ------------------------------------------------------------------------------
 # 7. DASHBOARD 3x2: GENERACIÓN DE LOS 6 GRÁFICOS
 # ------------------------------------------------------------------------------
-# Cálculo seguro de Pareto sin errores de sintaxis
 df_cat_grp = df_filtrado.groupby('Categoria', as_index=False)['Venta_Real_USD'].sum()
 df_pareto = df_cat_grp.sort_values(by='Venta_Real_USD', ascending=False).reset_index(drop=True)
 df_pareto['Acumulado'] = df_pareto['Venta_Real_USD'].cumsum()
 df_pareto['Porcentaje_Acumulado'] = (df_pareto['Acumulado'] / df_pareto['Venta_Real_USD'].sum()) * 100
 
-# Evolución Mensual
 df_mes = df_filtrado.groupby('Mes_Nombre', sort=False)[['Venta_Real_USD', 'Meta_Ventas_USD']].sum()
-
-# Mix de Canal
 df_canal = df_filtrado.groupby('Canal_Venta')['Venta_Real_USD'].sum()
 
-# Subplots 3x2
 fig = make_subplots(
     rows=3, cols=2,
     subplot_titles=(
@@ -365,7 +359,7 @@ fig = make_subplots(
     horizontal_spacing=0.08
 )
 
-# ----------------- [1, 1] EVOLUCIÓN MENSUAL -----------------
+# [1, 1] Evolución Mensual
 fig.add_trace(
     go.Scatter(
         x=df_mes.index,
@@ -392,7 +386,7 @@ fig.add_trace(
     row=1, col=1
 )
 
-# ----------------- [1, 2] PARETO POR CATEGORÍA -----------------
+# [1, 2] Pareto por Categoría
 fig.add_trace(
     go.Bar(
         x=df_pareto['Categoria'],
@@ -415,10 +409,9 @@ fig.add_trace(
     ),
     row=1, col=2, secondary_y=True
 )
-
 fig.add_hline(y=80, line_dash="dot", line_color="#94A3B8", row=1, col=2, secondary_y=True)
 
-# ----------------- [2, 1] MULTIDIMENSIONAL (4 VARIABLES) -----------------
+# [2, 1] Multidimensional (4 Variables)
 palette_canal = {'E-commerce': '#10B981', 'Tienda Física': '#F97316', 'Ventas B2B': '#2563EB', 'Mayorista': '#8B5CF6'}
 
 for canal in df_filtrado['Canal_Venta'].dropna().unique():
@@ -449,91 +442,10 @@ for canal in df_filtrado['Canal_Venta'].dropna().unique():
         row=2, col=1
     )
 
-# ----------------- [2, 2] BIGOTES / BOX PLOT (POR REGIÓN) -----------------
+# [2, 2] Bigotes / Box Plot por Región
 colores_box = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899']
 for i, reg in enumerate(df_filtrado['Region'].dropna().unique()):
     sub_df = df_filtrado[df_filtrado['Region'] == reg]
     fig.add_trace(
         go.Box(
             y=sub_df['Venta_Real_USD'],
-            name=reg,
-            boxpoints='outliers',
-            jitter=0.3,
-            pointpos=-1.8,
-            marker=dict(color=colores_box[i % len(colores_box)]),
-            line=dict(width=2),
-            showlegend=False
-        ),
-        row=2, col=2
-    )
-
-# ----------------- [3, 1] MIX POR CANAL (DONUT) -----------------
-fig.add_trace(
-    go.Pie(
-        labels=df_canal.index,
-        values=df_canal.values,
-        hole=0.68,
-        name='Canal',
-        marker=dict(
-            colors=['#10B981', '#F97316', '#2563EB', '#8B5CF6'],
-            line=dict(color='#FFFFFF', width=3)
-        ),
-        textinfo='percent',
-        hovertemplate='<b>%{label}</b><br>$%{value:,.0f} (%{percent})<extra></extra>',
-        showlegend=False
-    ),
-    row=3, col=1
-)
-
-# ----------------- [3, 2] HISTOGRAMA DE GANANCIA -----------------
-fig.add_trace(
-    go.Histogram(
-        x=df_filtrado['Ganancia_USD'],
-        nbinsx=25,
-        name='Frecuencia',
-        marker=dict(
-            color='#10B981',
-            line=dict(color='#FFFFFF', width=1)
-        ),
-        hovertemplate='Rango: $%{x}<br>Cantidad de Registros: %{y}<extra></extra>',
-        showlegend=False
-    ),
-    row=3, col=2
-)
-
-# ------------------------------------------------------------------------------
-# 8. LAYOUT GENERAL Y FORMATO
-# ------------------------------------------------------------------------------
-fig.update_layout(
-    font=dict(family='Plus Jakarta Sans, sans-serif', color='#475569', size=11),
-    paper_bgcolor='#FFFFFF',
-    plot_bgcolor='#FFFFFF',
-    height=1100,
-    hoverlabel=dict(bgcolor="#FFFFFF", font_size=12, font_family="Plus Jakarta Sans"),
-    legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="center",
-        x=0.5,
-        font=dict(size=11)
-    ),
-    margin=dict(t=80, b=40, l=40, r=40)
-)
-
-fig.update_xaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
-fig.update_yaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
-
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=1)
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=2, secondary_y=False)
-fig.update_yaxes(ticksuffix="%", range=[0, 105], row=1, col=2, secondary_y=True)
-
-fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=2)
-fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=3, col=2)
-
-# Despliegue en Streamlit
-st.markdown('<div class="dashboard-wrapper">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
