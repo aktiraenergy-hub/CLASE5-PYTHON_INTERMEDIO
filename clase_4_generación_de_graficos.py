@@ -77,6 +77,7 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        box-sizing: border-box;
     }
     .kpi-card:hover {
         transform: translateY(-3px);
@@ -221,17 +222,17 @@ total_ganancia = df_filtrado['Ganancia_USD'].sum()
 cumplimiento = (total_venta / total_meta * 100) if total_meta > 0 else 0
 margen_promedio = (total_ganancia / total_venta * 100) if total_venta > 0 else 0
 
-# Objetivos OKR Definidos para el Periodo
-OKR_META_VENTA = total_meta                         # OKR 1: Venta Real >= Meta Planificada
+# Objetivos OKR
+OKR_META_VENTA = total_meta
 okr_prog_venta = min(100.0, (total_venta / OKR_META_VENTA * 100)) if OKR_META_VENTA > 0 else 0
 
-OKR_CUMPLIMIENTO_OBJ = 100.0                       # OKR 2: Lograr al menos 100% de cumplimiento
+OKR_CUMPLIMIENTO_OBJ = 100.0
 okr_prog_cump = min(100.0, (cumplimiento / OKR_CUMPLIMIENTO_OBJ * 100))
 
-OKR_GANANCIA_OBJ = total_meta * 0.35               # OKR 3: Ganancia neta esperada (35% de la meta)
+OKR_GANANCIA_OBJ = total_meta * 0.35
 okr_prog_ganancia = min(100.0, (total_ganancia / OKR_GANANCIA_OBJ * 100)) if OKR_GANANCIA_OBJ > 0 else 0
 
-OKR_MARGEN_OBJ = 35.0                              # OKR 4: Margen operativo mínimo del 35%
+OKR_MARGEN_OBJ = 35.0
 okr_prog_margen = min(100.0, (margen_promedio / OKR_MARGEN_OBJ * 100))
 
 # ------------------------------------------------------------------------------
@@ -329,213 +330,4 @@ with col4:
 # ------------------------------------------------------------------------------
 # 7. DASHBOARD 3x2: GENERACIÓN DE LOS 6 GRÁFICOS
 # ------------------------------------------------------------------------------
-# Pre-cálculo para Pareto (Categoría)
-df_pareto = df_filtrado.groupby('Categoria')['Venta_Real_USD'].sum().sort_values(ascending=False).reset_index()
-df_pareto['Acumulado'] = df_pareto['Venta_Real_USD'].cumsum()
-df_pareto['Porcentaje_Acumulado'] = (df_pareto['Acumulado'] / df_pareto['Venta_Real_USD'].sum()) * 100
-
-# Pre-cálculo Agrupado Mensual
-df_mes = df_filtrado.groupby('Mes_Nombre', sort=False)[['Venta_Real_USD', 'Meta_Ventas_USD']].sum()
-
-# Pre-cálculo Donut Canal
-df_canal = df_filtrado.groupby('Canal_Venta')['Venta_Real_USD'].sum()
-
-# Configurar Subplots 3x2 con eje secundario para Pareto (Fila 1, Col 2)
-fig = make_subplots(
-    rows=3, cols=2,
-    subplot_titles=(
-        "<b>1. Evolución Mensual vs Meta Comercial</b>",
-        "<b>2. Diagrama de Pareto por Categoría (80/20)</b>",
-        "<b>3. Análisis Multidimensional (Venta, Ganancia, Margen, Canal)</b>",
-        "<b>4. Dispersión y Outliers por Región (Bigotes / Box Plot)</b>",
-        "<b>5. Mix de Ingresos por Canal Comercial</b>",
-        "<b>6. Histograma de Distribución de Ganancia</b>"
-    ),
-    specs=[
-        [{"type": "xy"}, {"type": "xy", "secondary_y": True}],
-        [{"type": "xy"}, {"type": "xy"}],
-        [{"type": "domain"}, {"type": "xy"}]
-    ],
-    vertical_spacing=0.11,
-    horizontal_spacing=0.08
-)
-
-# ----------------- [1, 1] EVOLUCIÓN MENSUAL -----------------
-fig.add_trace(
-    go.Scatter(
-        x=df_mes.index,
-        y=df_mes['Venta_Real_USD'],
-        name='Venta Real',
-        mode='lines+markers',
-        line=dict(color='#2563EB', width=3, shape='spline'),
-        marker=dict(size=6, color='#2563EB'),
-        fill='tozeroy',
-        fillcolor='rgba(37, 99, 235, 0.08)',
-        hovertemplate='<b>%{x}</b><br>Venta: $%{y:,.0f}<extra></extra>'
-    ),
-    row=1, col=1
-)
-fig.add_trace(
-    go.Scatter(
-        x=df_mes.index,
-        y=df_mes['Meta_Ventas_USD'],
-        name='Meta Comercial',
-        mode='lines',
-        line=dict(color='#EF4444', width=2.5, dash='dash', shape='spline'),
-        hovertemplate='<b>%{x}</b><br>Meta: $%{y:,.0f}<extra></extra>'
-    ),
-    row=1, col=1
-)
-
-# ----------------- [1, 2] PARETO POR CATEGORÍA -----------------
-fig.add_trace(
-    go.Bar(
-        x=df_pareto['Categoria'],
-        y=df_pareto['Venta_Real_USD'],
-        name='Venta ($)',
-        marker=dict(color='#1E293B', corner_radius=6 if hasattr(go.Bar(), 'corner_radius') else 0),
-        hovertemplate='<b>%{x}</b><br>Venta: $%{y:,.0f}<extra></extra>'
-    ),
-    row=1, col=2, secondary_y=False
-)
-fig.add_trace(
-    go.Scatter(
-        x=df_pareto['Categoria'],
-        y=df_pareto['Porcentaje_Acumulado'],
-        name='% Acumulado',
-        mode='lines+markers',
-        line=dict(color='#F97316', width=3),
-        marker=dict(size=7, color='#EA580C'),
-        hovertemplate='<b>%{x}</b><br>Acumulado: %{y:.1f}%<extra></extra>'
-    ),
-    row=1, col=2, secondary_y=True
-)
-
-# Línea de referencia del 80% (Ley de Pareto)
-fig.add_hline(y=80, line_dash="dot", line_color="#94A3B8", row=1, col=2, secondary_y=True)
-
-# ----------------- [2, 1] MULTIDIMENSIONAL (4 VARIABLES) -----------------
-# Var 1: X (Venta_Real_USD)
-# Var 2: Y (Ganancia_USD)
-# Var 3: Tamaño de Burbuja (Margen %)
-# Var 4: Color (Canal_Venta)
-palette_canal = {'E-commerce': '#10B981', 'Tienda Física': '#F97316', 'Ventas B2B': '#2563EB', 'Mayorista': '#8B5CF6'}
-
-for canal in df_filtrado['Canal_Venta'].dropna().unique():
-    sub_df = df_filtrado[df_filtrado['Canal_Venta'] == canal]
-    margen_calc = np.clip((sub_df['Ganancia_USD'] / sub_df['Venta_Real_USD'].replace(0, 1)) * 100, 5, 80)
-    
-    fig.add_trace(
-        go.Scatter(
-            x=sub_df['Venta_Real_USD'],
-            y=sub_df['Ganancia_USD'],
-            name=f'Canal: {canal}',
-            mode='markers',
-            marker=dict(
-                size=margen_calc,
-                sizemode='diameter',
-                sizeref=2.5,
-                color=palette_canal.get(canal, '#64748B'),
-                opacity=0.75,
-                line=dict(width=1, color='#FFFFFF')
-            ),
-            hovertemplate=(
-                f'<b>Canal: {canal}</b><br>' +
-                'Venta: $%{x:,.0f}<br>' +
-                'Ganancia: $%{y:,.0f}<br>' +
-                '<extra></extra>'
-            )
-        ),
-        row=2, col=1
-    )
-
-# ----------------- [2, 2] BIGOTES / BOX PLOT (POR REGIÓN) -----------------
-colores_box = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899']
-for i, reg in enumerate(df_filtrado['Region'].dropna().unique()):
-    sub_df = df_filtrado[df_filtrado['Region'] == reg]
-    fig.add_trace(
-        go.Box(
-            y=sub_df['Venta_Real_USD'],
-            name=reg,
-            boxpoints='outliers',
-            jitter=0.3,
-            pointpos=-1.8,
-            marker=dict(color=colores_box[i % len(colores_box)]),
-            line=dict(width=2),
-            showlegend=False
-        ),
-        row=2, col=2
-    )
-
-# ----------------- [3, 1] MIX POR CANAL (DONUT) -----------------
-fig.add_trace(
-    go.Pie(
-        labels=df_canal.index,
-        values=df_canal.values,
-        hole=0.68,
-        name='Canal',
-        marker=dict(
-            colors=['#10B981', '#F97316', '#2563EB', '#8B5CF6'],
-            line=dict(color='#FFFFFF', width=3)
-        ),
-        textinfo='percent',
-        hovertemplate='<b>%{label}</b><br>$%{value:,.0f} (%{percent})<extra></extra>',
-        showlegend=False
-    ),
-    row=3, col=1
-)
-
-# ----------------- [3, 2] HISTOGRAMA DE GANANCIA -----------------
-fig.add_trace(
-    go.Histogram(
-        x=df_filtrado['Ganancia_USD'],
-        nbinsx=25,
-        name='Frecuencia',
-        marker=dict(
-            color='#10B981',
-            line=dict(color='#FFFFFF', width=1)
-        ),
-        hovertemplate='Rango: $%{x}<br>Cantidad de Registros: %{y}<extra></extra>',
-        showlegend=False
-    ),
-    row=3, col=2
-)
-
-# ------------------------------------------------------------------------------
-# 8. LAYOUT GENERAL Y FORMATO
-# ------------------------------------------------------------------------------
-fig.update_layout(
-    font=dict(family='Plus Jakarta Sans, sans-serif', color='#475569', size=11),
-    paper_bgcolor='#FFFFFF',
-    plot_bgcolor='#FFFFFF',
-    height=1100,  # Altura adecuada para la matriz de 3x2
-    hoverlabel=dict(bgcolor="#FFFFFF", font_size=12, font_family="Plus Jakarta Sans"),
-    legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="center",
-        x=0.5,
-        font=dict(size=11)
-    ),
-    margin=dict(t=80, b=40, l=40, r=40)
-)
-
-# Rejillas y ejes
-fig.update_xaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
-fig.update_yaxes(showgrid=True, gridcolor='#F1F5F9', zeroline=False)
-
-# Formateo monetario en ejes
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=1)
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=1, col=2, secondary_y=False)
-fig.update_yaxes(ticksuffix="%", range=[0, 105], row=1, col=2, secondary_y=True)
-
-fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=1)
-fig.update_yaxes(tickprefix="$", tickformat=",.0f", row=2, col=2)
-fig.update_xaxes(tickprefix="$", tickformat=",.0f", row=3, col=2)
-
-# Despliegue en Streamlit
-st.markdown('<div class="dashboard-wrapper">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+df_pareto = df_filtrado.groupby('Categoria')['Venta_Real_USD'].sum().sort_values(ascending=False).reset
